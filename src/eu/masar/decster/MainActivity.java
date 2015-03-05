@@ -19,6 +19,9 @@ import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -78,14 +81,9 @@ public class MainActivity extends Activity {
 
 		buttonConnect.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
-				//If address did not chang refresh instead of reconnect
+				//If address did not change refresh instead of reconnect
 				if(!address.equals(editAddress.getText().toString())){
-					address=editAddress.getText().toString();
-					password=editPassword.getText().toString();
-					editor.putString("address", address);
-					editor.putString("password", password);
-					editor.putString("ain", editAin.getText().toString());
-					editor.commit();
+					storeSettings();
 					FritzAuthConnector fritzAuthConnector = new FritzAuthConnector();
 					fritzAuthConnector.execute();
 					FritzConnector fritzConnector = new FritzConnector();
@@ -117,7 +115,7 @@ public class MainActivity extends Activity {
 		editAddress.setText(address);
 		editAin.setText(preferences.getString("ain", ""));
 		//		editPassword.setText(password);
-		editor = preferences.edit();
+		//		editor = preferences.edit();
 		refreshStatus();
 	}
 	@Override
@@ -156,11 +154,14 @@ public class MainActivity extends Activity {
 			runOnUiThread(new Runnable() {
 				@Override
 				public void run() {
-					//getswitchlist, setswitchon, setswitchoff, getswitchstate, getswitchname
-					if(switchcmd.equals(switchcmds.SWITCH_ON)||switchcmd.equals(switchcmds.SWITCH_OFF)||switchcmd.equals(switchcmds.SWITCH_GET)){
-						buttonToggleDevice.setChecked(result.contains("1"));
-					} else if(switchcmd.equals(switchcmds.GET_SWITCH_LIST)){
-						//TODO getSwitchListLogik
+					//If request was unsuccessful we will be presented a NULL here
+					if(result!=null){
+						//getswitchlist, setswitchon, setswitchoff, getswitchstate, getswitchname
+						if(switchcmd.equals(switchcmds.SWITCH_ON)||switchcmd.equals(switchcmds.SWITCH_OFF)||switchcmd.equals(switchcmds.SWITCH_GET)){
+							buttonToggleDevice.setChecked(result.contains("1"));
+						} else if(switchcmd.equals(switchcmds.GET_SWITCH_LIST)){
+							//TODO getSwitchListLogik
+						}
 					}
 				}
 			});
@@ -216,5 +217,43 @@ public class MainActivity extends Activity {
 			}
 			return "";
 		}
+	}
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		MenuInflater inflater = getMenuInflater();
+		inflater.inflate(R.menu.main_options_menu, menu);
+		return true;
+	}
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+
+		switch (item.getItemId()) {
+		case R.id.menu_save:
+			storeSettings();
+			break;
+		case R.id.menu_clear:
+			clearSettings();
+			break;
+
+		default:
+			break;
+		}
+		return true;
+	}
+
+	public void storeSettings(){
+		address=editAddress.getText().toString();
+		password=editPassword.getText().toString();
+		editor = preferences.edit();
+		editor.putString("address", address);
+		editor.putString("password", password);
+		editor.putString("ain", editAin.getText().toString());
+		editor.commit();
+	}
+	
+	public void clearSettings(){
+		editor = preferences.edit();
+		editor.clear();
+		editor.commit();
 	}
 }

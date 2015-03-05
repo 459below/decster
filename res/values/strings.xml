@@ -11,4 +11,6 @@
     <string name="button_refresh">Refresh</string>
     <string name="switch_device_on">Device on</string>
     <string name="switch_device_off">Device off</string>
+    <string name="menu_save">Save</string>
+    <string name="menu_clear">Clear</string>
 </resources>
