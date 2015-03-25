@@ -27,10 +27,10 @@ public final class R {
     public static final class id {
         public static final int button_connect=0x7f080004;
         public static final int edit_address=0x7f080001;
-        public static final int edit_ain=0x7f080007;
         public static final int edit_password=0x7f080003;
         public static final int menu_clear=0x7f080009;
         public static final int menu_save=0x7f080008;
+        public static final int spinner_ain=0x7f080007;
         public static final int switch_device=0x7f080006;
         public static final int text_address=0x7f080000;
         public static final int text_password=0x7f080002;

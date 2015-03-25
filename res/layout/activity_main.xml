@@ -73,14 +73,12 @@
         android:textOff="@string/switch_device_off"
         android:textOn="@string/switch_device_on" />
 
-    <EditText
-        android:id="@+id/edit_ain"
+    <Spinner
+        android:id="@+id/spinner_ain"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignBottom="@id/switch_device"
         android:layout_alignLeft="@id/edit_address"
-        android:layout_alignRight="@id/edit_address"
-        android:ems="7"
-        android:inputType="number" />
+        android:layout_alignRight="@id/edit_address" />
 
 </RelativeLayout>

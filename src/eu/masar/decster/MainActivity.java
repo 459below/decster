@@ -4,6 +4,8 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -15,6 +17,7 @@ import org.apache.http.util.EntityUtils;
 import org.w3c.dom.Document;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -23,8 +26,10 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 import eu.masar.decster.R;
@@ -54,21 +59,24 @@ public class MainActivity extends Activity {
 		public static final String SWITCH_ON = "setswitchon";
 		public static final String SWITCH_OFF = "setswitchoff";
 		public static final String SWITCH_GET = "getswitchstate";
-		public static final String SWITCH_NAME = "getswitchlist";
+		public static final String SWITCH_NAME = "getswitchname";
 	}
 
 	TextView tvStatus;
 	Button buttonConnect;
 	ToggleButton buttonToggleDevice;
-	EditText editAddress, editPassword, editAin;
+	EditText editAddress, editPassword;
+	Spinner spinnerAin;
 	DefaultHttpClient androidHttpClient;
 	SharedPreferences preferences;
 	SharedPreferences.Editor editor;
 	String sid = "", address = "", password = "";
 	String tag = this.getClass().getSimpleName();
+	Context context;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
+		context = getApplicationContext();
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		tvStatus = (TextView) findViewById(R.id.text_status);
@@ -76,8 +84,7 @@ public class MainActivity extends Activity {
 		buttonToggleDevice = (ToggleButton) findViewById(R.id.switch_device);
 		editAddress = (EditText) findViewById(R.id.edit_address);
 		editPassword = (EditText) findViewById(R.id.edit_password);
-		editAin = (EditText) findViewById(R.id.edit_ain);
-		androidHttpClient = new DefaultHttpClient();
+		spinnerAin = (Spinner) findViewById(R.id.spinner_ain);
 
 		buttonConnect.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
@@ -97,7 +104,7 @@ public class MainActivity extends Activity {
 		buttonToggleDevice.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				String switchcmd;
-				String ain=editAin.getText().toString();
+				String ain=spinnerAin.getSelectedItem().toString();
 				if(buttonToggleDevice.isChecked()){
 					switchcmd=switchcmds.SWITCH_ON;
 				} else {
@@ -113,7 +120,7 @@ public class MainActivity extends Activity {
 		address = preferences.getString("address", "fritz.box");
 		password = preferences.getString("password", "");
 		editAddress.setText(address);
-		editAin.setText(preferences.getString("ain", ""));
+		//spinnerAin.setText(preferences.getString("ain", ""));
 		//		editPassword.setText(password);
 		//		editor = preferences.edit();
 		refreshStatus();
@@ -125,11 +132,15 @@ public class MainActivity extends Activity {
 	}
 
 	private void refreshStatus(){
-		if(!password.equals("")){
+		if(!password.equals("")&&(sid.equals("")||sid.equals("0000000000000000"))){
 			FritzAuthConnector fritzAuthConnector = new FritzAuthConnector();
 			fritzAuthConnector.execute();
 			FritzConnector fritzConnector = new FritzConnector();
-			fritzConnector.execute(switchcmds.SWITCH_GET, editAin.getText().toString());
+			fritzConnector.execute(switchcmds.GET_SWITCH_LIST, "");
+		}
+		if(spinnerAin.getSelectedItem()!=null){
+			FritzConnector fritzConnector = new FritzConnector();
+			fritzConnector.execute(switchcmds.SWITCH_GET, spinnerAin.getSelectedItem().toString());
 		}
 	}
 
@@ -138,11 +149,18 @@ public class MainActivity extends Activity {
 		@Override
 		protected String doInBackground(String... params) {
 			try {
+				androidHttpClient = new DefaultHttpClient();
+				HttpGet request=null;
 				switchcmd = params[0];
 				ain = params[1];
-				HttpGet request = new HttpGet ("http://"+address+"/webservices/homeautoswitch.lua?sid="+sid+"&switchcmd="+switchcmd+"&ain="+ain);
+				if(switchcmd.equals(switchcmds.SWITCH_ON)||switchcmd.equals(switchcmds.SWITCH_OFF)||switchcmd.equals(switchcmds.SWITCH_GET)){
+					request = new HttpGet ("http://"+address+"/webservices/homeautoswitch.lua?sid="+sid+"&switchcmd="+switchcmd+"&ain="+ain);
+				} else if(switchcmd.equals(switchcmds.GET_SWITCH_LIST)){
+					request = new HttpGet ("http://"+address+"/webservices/homeautoswitch.lua?sid="+sid+"&switchcmd="+switchcmd);
+				}
 				HttpResponse response = androidHttpClient.execute(request);
 				String responseString = EntityUtils.toString(response.getEntity());
+				response.getEntity().consumeContent();
 				return responseString;
 			} catch (Exception e) {
 				Log.e(tag, e.toString());
@@ -161,6 +179,15 @@ public class MainActivity extends Activity {
 							buttonToggleDevice.setChecked(result.contains("1"));
 						} else if(switchcmd.equals(switchcmds.GET_SWITCH_LIST)){
 							//TODO getSwitchListLogik
+							List<String> spinnerArray =  new ArrayList<String>();
+							for (String aktor : result.split(",")){
+								spinnerArray.add(aktor);
+							}
+
+							ArrayAdapter<String> adapter = new ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, spinnerArray);
+							adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+							Spinner sItems = (Spinner) findViewById(R.id.spinner_ain);
+							sItems.setAdapter(adapter);
 						}
 					}
 				}
@@ -172,17 +199,21 @@ public class MainActivity extends Activity {
 		@Override
 		protected String[] doInBackground(String... params) {
 			try {
+				androidHttpClient = new DefaultHttpClient();
 				HttpGet request = new HttpGet ("http://"+address+"/login_sid.lua");
 				HttpResponse response = androidHttpClient.execute(request);
 				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 				DocumentBuilder builder = factory.newDocumentBuilder();
 				Document document = builder.parse(response.getEntity().getContent());
+				response.getEntity().consumeContent();
 				sid = document.getElementsByTagName("SID").item(0).getFirstChild().getNodeValue();
 				if(sid.equals("0000000000000000")){
+					androidHttpClient = new DefaultHttpClient();
 					String challenge = document.getElementsByTagName("Challenge").item(0).getFirstChild().getNodeValue();
 					request = new HttpGet ("http://"+address+"/login_sid.lua?response="+getResponse(challenge, password));
 					response = androidHttpClient.execute(request);
 					document = builder.parse(response.getEntity().getContent());
+					response.getEntity().consumeContent();
 					sid = document.getElementsByTagName("SID").item(0).getFirstChild().getNodeValue();
 				}
 				runOnUiThread(new Runnable() {
@@ -191,8 +222,6 @@ public class MainActivity extends Activity {
 						if(!sid.equals("0000000000000000")){
 							tvStatus.setText(R.string.text_status_connected);
 							buttonConnect.setText(R.string.button_refresh);
-							FritzConnector fritzConnector = new FritzConnector();
-							fritzConnector.execute(switchcmds.SWITCH_GET, editAin.getText().toString());
 						} else {
 							tvStatus.setText(R.string.text_status_not_connected);
 							buttonConnect.setText(R.string.button_connect);
@@ -247,10 +276,9 @@ public class MainActivity extends Activity {
 		editor = preferences.edit();
 		editor.putString("address", address);
 		editor.putString("password", password);
-		editor.putString("ain", editAin.getText().toString());
 		editor.commit();
 	}
-	
+
 	public void clearSettings(){
 		editor = preferences.edit();
 		editor.clear();
