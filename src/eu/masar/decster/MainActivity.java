@@ -26,6 +26,8 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -67,12 +69,12 @@ public class MainActivity extends Activity {
 	ToggleButton buttonToggleDevice;
 	EditText editAddress, editPassword;
 	Spinner spinnerAin;
-	DefaultHttpClient androidHttpClient;
 	SharedPreferences preferences;
 	SharedPreferences.Editor editor;
-	String sid = "", address = "", password = "";
 	String tag = this.getClass().getSimpleName();
 	Context context;
+	String sid = "", address = "", password = "";
+	List<String> aktore;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -91,10 +93,7 @@ public class MainActivity extends Activity {
 				//If address did not change refresh instead of reconnect
 				if(!address.equals(editAddress.getText().toString())){
 					storeSettings();
-					FritzAuthConnector fritzAuthConnector = new FritzAuthConnector();
-					fritzAuthConnector.execute();
-					FritzConnector fritzConnector = new FritzConnector();
-					fritzConnector.execute(switchcmds.GET_SWITCH_LIST, "");
+					refreshStatus();
 				} else {
 					refreshStatus();
 				}
@@ -105,13 +104,29 @@ public class MainActivity extends Activity {
 			public void onClick(View v) {
 				String switchcmd;
 				String ain=spinnerAin.getSelectedItem().toString();
-				if(buttonToggleDevice.isChecked()){
-					switchcmd=switchcmds.SWITCH_ON;
-				} else {
-					switchcmd=switchcmds.SWITCH_OFF;
+				if(ain!=null&&!ain.equals("")){
+					if(buttonToggleDevice.isChecked()){
+						switchcmd=switchcmds.SWITCH_ON;
+					} else {
+						switchcmd=switchcmds.SWITCH_OFF;
+					}
+					FritzConnector fritzConnector = new FritzConnector();
+					fritzConnector.execute(switchcmd, ain);
 				}
-				FritzConnector fritzConnector = new FritzConnector();
-				fritzConnector.execute(switchcmd, ain);
+			}
+		});
+		
+		spinnerAin.setOnItemSelectedListener(new OnItemSelectedListener() {
+
+			@Override
+			public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+//				parent.getItemAtPosition(position).toString();
+				refreshStatus();
+			}
+
+			@Override
+			public void onNothingSelected(AdapterView<?> arg0) {
+				//Do nothing for now
 			}
 		});
 
@@ -132,35 +147,45 @@ public class MainActivity extends Activity {
 	}
 
 	private void refreshStatus(){
-		if(!password.equals("")&&(sid.equals("")||sid.equals("0000000000000000"))){
-			FritzAuthConnector fritzAuthConnector = new FritzAuthConnector();
-			fritzAuthConnector.execute();
-			FritzConnector fritzConnector = new FritzConnector();
-			fritzConnector.execute(switchcmds.GET_SWITCH_LIST, "");
-		}
+		FritzConnector fritzConnector = new FritzConnector();
+		fritzConnector.execute(switchcmds.GET_SWITCH_LIST);
+		//		}
 		if(spinnerAin.getSelectedItem()!=null){
-			FritzConnector fritzConnector = new FritzConnector();
-			fritzConnector.execute(switchcmds.SWITCH_GET, spinnerAin.getSelectedItem().toString());
+			String ain=spinnerAin.getSelectedItem().toString();
+			fritzConnector = new FritzConnector();
+			fritzConnector.execute(switchcmds.SWITCH_GET,ain);
+			fritzConnector = new FritzConnector();
+			fritzConnector.execute(switchcmds.SWITCH_NAME,ain);
 		}
 	}
 
 	private class FritzConnector extends AsyncTask<String, Void, String> {
 		String switchcmd, ain;
+		
 		@Override
 		protected String doInBackground(String... params) {
 			try {
-				androidHttpClient = new DefaultHttpClient();
+				if(!password.equals("")&&(sid.equals("")||sid.equals("0000000000000000"))){
+					FritzAuthConnector fritzAuthConnector = new FritzAuthConnector();
+					fritzAuthConnector.execute();
+				}
+
+				DefaultHttpClient androidHttpClient = new DefaultHttpClient();
 				HttpGet request=null;
 				switchcmd = params[0];
-				ain = params[1];
-				if(switchcmd.equals(switchcmds.SWITCH_ON)||switchcmd.equals(switchcmds.SWITCH_OFF)||switchcmd.equals(switchcmds.SWITCH_GET)){
+				if(
+						switchcmd.equals(switchcmds.SWITCH_ON)||
+						switchcmd.equals(switchcmds.SWITCH_OFF)||
+						switchcmd.equals(switchcmds.SWITCH_GET)||
+						switchcmd.equals(switchcmds.SWITCH_NAME)){
+					ain = params[1];
 					request = new HttpGet ("http://"+address+"/webservices/homeautoswitch.lua?sid="+sid+"&switchcmd="+switchcmd+"&ain="+ain);
 				} else if(switchcmd.equals(switchcmds.GET_SWITCH_LIST)){
 					request = new HttpGet ("http://"+address+"/webservices/homeautoswitch.lua?sid="+sid+"&switchcmd="+switchcmd);
 				}
 				HttpResponse response = androidHttpClient.execute(request);
 				String responseString = EntityUtils.toString(response.getEntity());
-				response.getEntity().consumeContent();
+				//				response.getEntity().consumeContent();
 				return responseString;
 			} catch (Exception e) {
 				Log.e(tag, e.toString());
@@ -177,17 +202,23 @@ public class MainActivity extends Activity {
 						//getswitchlist, setswitchon, setswitchoff, getswitchstate, getswitchname
 						if(switchcmd.equals(switchcmds.SWITCH_ON)||switchcmd.equals(switchcmds.SWITCH_OFF)||switchcmd.equals(switchcmds.SWITCH_GET)){
 							buttonToggleDevice.setChecked(result.contains("1"));
+						} else if(switchcmd.equals(switchcmds.SWITCH_NAME)) {
+							if(result!=null&&!result.equals("")){
+								buttonToggleDevice.setText(result.replaceAll("\\s", ""));
+							}
 						} else if(switchcmd.equals(switchcmds.GET_SWITCH_LIST)){
-							//TODO getSwitchListLogik
 							List<String> spinnerArray =  new ArrayList<String>();
-							for (String aktor : result.split(",")){
+							for (String aktor : result.replaceAll("\\s", "").split(",")){//removing all whitespaces then splitting it at ','
 								spinnerArray.add(aktor);
 							}
-
-							ArrayAdapter<String> adapter = new ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, spinnerArray);
-							adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-							Spinner sItems = (Spinner) findViewById(R.id.spinner_ain);
-							sItems.setAdapter(adapter);
+							//Only rebuild spinner list has changed (unlikely)
+							if(!spinnerArray.equals(aktore)){
+								aktore=spinnerArray;
+								ArrayAdapter<String> adapter = new ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, spinnerArray);
+								adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+								Spinner sItems = (Spinner) findViewById(R.id.spinner_ain);
+								sItems.setAdapter(adapter);
+							}
 						}
 					}
 				}
@@ -199,27 +230,27 @@ public class MainActivity extends Activity {
 		@Override
 		protected String[] doInBackground(String... params) {
 			try {
-				androidHttpClient = new DefaultHttpClient();
+				DefaultHttpClient androidHttpClient = new DefaultHttpClient();
 				HttpGet request = new HttpGet ("http://"+address+"/login_sid.lua");
 				HttpResponse response = androidHttpClient.execute(request);
 				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 				DocumentBuilder builder = factory.newDocumentBuilder();
 				Document document = builder.parse(response.getEntity().getContent());
-				response.getEntity().consumeContent();
+				//				response.getEntity().consumeContent();
 				sid = document.getElementsByTagName("SID").item(0).getFirstChild().getNodeValue();
-				if(sid.equals("0000000000000000")){
+				if(sid.equals("")||sid.equals("0000000000000000")){
 					androidHttpClient = new DefaultHttpClient();
 					String challenge = document.getElementsByTagName("Challenge").item(0).getFirstChild().getNodeValue();
 					request = new HttpGet ("http://"+address+"/login_sid.lua?response="+getResponse(challenge, password));
 					response = androidHttpClient.execute(request);
 					document = builder.parse(response.getEntity().getContent());
-					response.getEntity().consumeContent();
+					//					response.getEntity().consumeContent();
 					sid = document.getElementsByTagName("SID").item(0).getFirstChild().getNodeValue();
 				}
 				runOnUiThread(new Runnable() {
 					@Override
 					public void run() {
-						if(!sid.equals("0000000000000000")){
+						if(!sid.equals("")&&!sid.equals("0000000000000000")){
 							tvStatus.setText(R.string.text_status_connected);
 							buttonConnect.setText(R.string.button_refresh);
 						} else {
