@@ -1,9 +1,7 @@
 package eu.masar.decster;
 
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,6 +34,8 @@ import android.widget.TextView;
 import android.widget.ToggleButton;
 import eu.masar.decster.R;
 
+import net.hockeyapp.android.CheckUpdateTask;
+
 /**
  * This file is part of Decster.
  * Decster is free software: you can redistribute it and/or modify
@@ -56,6 +56,7 @@ import eu.masar.decster.R;
  *
  */
 public class MainActivity extends Activity {
+	private CheckUpdateTask checkUpdateTask;
 	public static class switchcmds {
 		public static final String GET_SWITCH_LIST = "getswitchlist";
 		public static final String SWITCH_ON = "setswitchon";
@@ -88,6 +89,9 @@ public class MainActivity extends Activity {
 		editPassword = (EditText) findViewById(R.id.edit_password);
 		spinnerAin = (Spinner) findViewById(R.id.spinner_ain);
 
+//		UpdateActivity.iconDrawableId = R.drawable.icon;
+		checkForUpdates();
+		
 		buttonConnect.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				//If address did not change refresh instead of reconnect
@@ -135,9 +139,6 @@ public class MainActivity extends Activity {
 		address = preferences.getString("address", "fritz.box");
 		password = preferences.getString("password", "");
 		editAddress.setText(address);
-		//spinnerAin.setText(preferences.getString("ain", ""));
-		//		editPassword.setText(password);
-		//		editor = preferences.edit();
 		refreshStatus();
 	}
 	@Override
@@ -149,7 +150,7 @@ public class MainActivity extends Activity {
 	private void refreshStatus(){
 		FritzConnector fritzConnector = new FritzConnector();
 		fritzConnector.execute(switchcmds.GET_SWITCH_LIST);
-		//		}
+		
 		if(spinnerAin.getSelectedItem()!=null){
 			String ain=spinnerAin.getSelectedItem().toString();
 			fritzConnector = new FritzConnector();
@@ -166,8 +167,46 @@ public class MainActivity extends Activity {
 		protected String doInBackground(String... params) {
 			try {
 				if(!password.equals("")&&(sid.equals("")||sid.equals("0000000000000000"))){
-					FritzAuthConnector fritzAuthConnector = new FritzAuthConnector();
-					fritzAuthConnector.execute();
+//					FritzAuthConnector fritzAuthConnector = new FritzAuthConnector();
+//					fritzAuthConnector.execute();
+					try {
+						DefaultHttpClient androidHttpClient = new DefaultHttpClient();
+						HttpGet request = new HttpGet ("http://"+address+"/login_sid.lua");
+						HttpResponse response = androidHttpClient.execute(request);
+						DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+						DocumentBuilder builder = factory.newDocumentBuilder();
+						Document document = builder.parse(response.getEntity().getContent());
+						//				response.getEntity().consumeContent();
+						sid = document.getElementsByTagName("SID").item(0).getFirstChild().getNodeValue();
+						if(sid.equals("")||sid.equals("0000000000000000")){
+							androidHttpClient = new DefaultHttpClient();
+							String challenge = document.getElementsByTagName("Challenge").item(0).getFirstChild().getNodeValue();
+							MessageDigest md;
+							md = MessageDigest.getInstance("MD5");
+							byte[] byteArray;
+							byteArray = (challenge + "-" + password).getBytes("utf-16le");
+							String responseString = challenge + "-" + new BigInteger(1,md.digest(byteArray)).toString(16);
+							request = new HttpGet ("http://"+address+"/login_sid.lua?response="+responseString);
+							response = androidHttpClient.execute(request);
+							document = builder.parse(response.getEntity().getContent());
+							//					response.getEntity().consumeContent();
+							sid = document.getElementsByTagName("SID").item(0).getFirstChild().getNodeValue();
+						}
+						runOnUiThread(new Runnable() {
+							@Override
+							public void run() {
+								if(!sid.equals("")&&!sid.equals("0000000000000000")){
+									tvStatus.setText(R.string.text_status_connected);
+									buttonConnect.setText(R.string.button_refresh);
+								} else {
+									tvStatus.setText(R.string.text_status_not_connected);
+									buttonConnect.setText(R.string.button_connect);
+								}
+							}
+						});
+					} catch (Exception e) {
+						Log.e(tag, e.toString());
+					}
 				}
 
 				DefaultHttpClient androidHttpClient = new DefaultHttpClient();
@@ -204,7 +243,7 @@ public class MainActivity extends Activity {
 							buttonToggleDevice.setChecked(result.contains("1"));
 						} else if(switchcmd.equals(switchcmds.SWITCH_NAME)) {
 							if(result!=null&&!result.equals("")){
-								buttonToggleDevice.setText(result.replaceAll("\\s", ""));
+								tvStatus.setText(result.replaceAll("\\s", ""));
 							}
 						} else if(switchcmd.equals(switchcmds.GET_SWITCH_LIST)){
 							List<String> spinnerArray =  new ArrayList<String>();
@@ -226,58 +265,6 @@ public class MainActivity extends Activity {
 		}
 	}
 
-	private class FritzAuthConnector extends AsyncTask<String, Void, String[]> {
-		@Override
-		protected String[] doInBackground(String... params) {
-			try {
-				DefaultHttpClient androidHttpClient = new DefaultHttpClient();
-				HttpGet request = new HttpGet ("http://"+address+"/login_sid.lua");
-				HttpResponse response = androidHttpClient.execute(request);
-				DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-				DocumentBuilder builder = factory.newDocumentBuilder();
-				Document document = builder.parse(response.getEntity().getContent());
-				//				response.getEntity().consumeContent();
-				sid = document.getElementsByTagName("SID").item(0).getFirstChild().getNodeValue();
-				if(sid.equals("")||sid.equals("0000000000000000")){
-					androidHttpClient = new DefaultHttpClient();
-					String challenge = document.getElementsByTagName("Challenge").item(0).getFirstChild().getNodeValue();
-					request = new HttpGet ("http://"+address+"/login_sid.lua?response="+getResponse(challenge, password));
-					response = androidHttpClient.execute(request);
-					document = builder.parse(response.getEntity().getContent());
-					//					response.getEntity().consumeContent();
-					sid = document.getElementsByTagName("SID").item(0).getFirstChild().getNodeValue();
-				}
-				runOnUiThread(new Runnable() {
-					@Override
-					public void run() {
-						if(!sid.equals("")&&!sid.equals("0000000000000000")){
-							tvStatus.setText(R.string.text_status_connected);
-							buttonConnect.setText(R.string.button_refresh);
-						} else {
-							tvStatus.setText(R.string.text_status_not_connected);
-							buttonConnect.setText(R.string.button_connect);
-						}
-					}
-				});
-			} catch (Exception e) {
-				Log.e(tag, e.toString());
-			}
-			return null;
-		}
-
-		public String getResponse (String challenge, String password) throws NoSuchAlgorithmException {
-			try {
-				MessageDigest md;
-				md = MessageDigest.getInstance("MD5");
-				byte[] byteArray;
-				byteArray = (challenge + "-" + password).getBytes("utf-16le");
-				return challenge + "-" + new BigInteger(1,md.digest(byteArray)).toString(16);
-			} catch (UnsupportedEncodingException e) {
-				Log.e(tag, "The encoding is not supported!");
-			}
-			return "";
-		}
-	}
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		MenuInflater inflater = getMenuInflater();
@@ -314,5 +301,22 @@ public class MainActivity extends Activity {
 		editor = preferences.edit();
 		editor.clear();
 		editor.commit();
+	}
+	
+	@Override
+	public Object onRetainNonConfigurationInstance() {
+		checkUpdateTask.detach();
+		return checkUpdateTask;
+	}
+
+	private void checkForUpdates() {
+		checkUpdateTask = (CheckUpdateTask)getLastNonConfigurationInstance();
+		if (checkUpdateTask != null) {
+			checkUpdateTask.attach(this);
+		}
+		else {
+			checkUpdateTask = new CheckUpdateTask(this, "https://www.459below.org/hockey/");
+			checkUpdateTask.execute();
+		}
 	}
 }
