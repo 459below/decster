@@ -124,7 +124,6 @@ public class MainActivity extends Activity {
 
 			@Override
 			public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-//				parent.getItemAtPosition(position).toString();
 				refreshStatus();
 			}
 
@@ -167,8 +166,6 @@ public class MainActivity extends Activity {
 		protected String doInBackground(String... params) {
 			try {
 				if(!password.equals("")&&(sid.equals("")||sid.equals("0000000000000000"))){
-//					FritzAuthConnector fritzAuthConnector = new FritzAuthConnector();
-//					fritzAuthConnector.execute();
 					try {
 						DefaultHttpClient androidHttpClient = new DefaultHttpClient();
 						HttpGet request = new HttpGet ("http://"+address+"/login_sid.lua");
@@ -250,7 +247,7 @@ public class MainActivity extends Activity {
 							for (String aktor : result.replaceAll("\\s", "").split(",")){//removing all whitespaces then splitting it at ','
 								spinnerArray.add(aktor);
 							}
-							//Only rebuild spinner list has changed (unlikely)
+							//Only rebuild spinner if list has changed (unlikely!)
 							if(!spinnerArray.equals(aktore)){
 								aktore=spinnerArray;
 								ArrayAdapter<String> adapter = new ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, spinnerArray);
