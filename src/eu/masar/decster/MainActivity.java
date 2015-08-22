@@ -34,8 +34,6 @@ import android.widget.TextView;
 import android.widget.ToggleButton;
 import eu.masar.decster.R;
 
-import net.hockeyapp.android.CheckUpdateTask;
-
 /**
  * This file is part of Decster.
  * Decster is free software: you can redistribute it and/or modify
@@ -56,7 +54,6 @@ import net.hockeyapp.android.CheckUpdateTask;
  *
  */
 public class MainActivity extends Activity {
-	private CheckUpdateTask checkUpdateTask;
 	public static class switchcmds {
 		public static final String GET_SWITCH_LIST = "getswitchlist";
 		public static final String SWITCH_ON = "setswitchon";
@@ -89,9 +86,6 @@ public class MainActivity extends Activity {
 		editPassword = (EditText) findViewById(R.id.edit_password);
 		spinnerAin = (Spinner) findViewById(R.id.spinner_ain);
 
-//		UpdateActivity.iconDrawableId = R.drawable.icon;
-		checkForUpdates();
-		
 		buttonConnect.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				//If address did not change refresh instead of reconnect
@@ -298,22 +292,5 @@ public class MainActivity extends Activity {
 		editor = preferences.edit();
 		editor.clear();
 		editor.commit();
-	}
-	
-	@Override
-	public Object onRetainNonConfigurationInstance() {
-		checkUpdateTask.detach();
-		return checkUpdateTask;
-	}
-
-	private void checkForUpdates() {
-		checkUpdateTask = (CheckUpdateTask)getLastNonConfigurationInstance();
-		if (checkUpdateTask != null) {
-			checkUpdateTask.attach(this);
-		}
-		else {
-			checkUpdateTask = new CheckUpdateTask(this, "https://www.example.com/hockey/");
-			checkUpdateTask.execute();
-		}
 	}
 }
