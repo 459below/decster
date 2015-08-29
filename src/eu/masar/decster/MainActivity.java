@@ -312,7 +312,7 @@ public class MainActivity extends Activity {
 			checkUpdateTask.attach(this);
 		}
 		else {
-			checkUpdateTask = new CheckUpdateTask(this, "https://www.example.com/hockey/");
+			checkUpdateTask = new CheckUpdateTask(this, "https://www.459below.org/hockey/");
 			checkUpdateTask.execute();
 		}
 	}
