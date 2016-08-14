@@ -13,6 +13,8 @@ import java.util.List;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import org.w3c.dom.Document;
 
 import android.app.Activity;
@@ -35,6 +37,8 @@ import android.widget.TextView;
 import android.widget.ToggleButton;
 import eu.masar.decster.R;
 
+import net.hockeyapp.android.CheckUpdateTask;
+
 /**
  * This file is part of Decster.
  * Decster is free software: you can redistribute it and/or modify
@@ -55,6 +59,7 @@ import eu.masar.decster.R;
  *
  */
 public class MainActivity extends Activity {
+	private CheckUpdateTask checkUpdateTask;
 	public static class switchcmds {
 		public static final String GET_SWITCH_LIST = "getswitchlist";
 		public static final String SWITCH_ON = "setswitchon";
@@ -62,6 +67,12 @@ public class MainActivity extends Activity {
 		public static final String SWITCH_GET = "getswitchstate";
 		public static final String SWITCH_NAME = "getswitchname";
 	}
+
+	private static final int REQUEST_EXTERNAL_STORAGE = 1;
+	private static String[] PERMISSIONS_STORAGE = {
+		Manifest.permission.READ_EXTERNAL_STORAGE,
+		Manifest.permission.WRITE_EXTERNAL_STORAGE
+	};
 
 	TextView tvStatus;
 	Button buttonConnect;
@@ -86,6 +97,9 @@ public class MainActivity extends Activity {
 		editAddress = (EditText) findViewById(R.id.edit_address);
 		editPassword = (EditText) findViewById(R.id.edit_password);
 		spinnerAin = (Spinner) findViewById(R.id.spinner_ain);
+
+		verifyStoragePermissions();
+		checkForUpdates();
 
 		buttonConnect.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
@@ -299,5 +313,39 @@ public class MainActivity extends Activity {
 		editor = preferences.edit();
 		editor.clear();
 		editor.commit();
+	}
+
+	private void checkForUpdates() {
+		checkUpdateTask = (CheckUpdateTask)getLastNonConfigurationInstance();
+		if (checkUpdateTask != null) {
+			checkUpdateTask.attach(this);
+		}
+		else {
+			checkUpdateTask = new CheckUpdateTask(this, "https://www.459below.org/hockey/");
+			checkUpdateTask.execute();
+		}
+	}
+
+	@Override
+	public Object onRetainNonConfigurationInstance() {
+		checkUpdateTask.detach();
+		return checkUpdateTask;
+	}
+
+	/**
+	 * Checks if the app has permission to write to device storage
+	 *
+	 * If the app does not has permission then the user will be prompted to grant permissions
+	 */
+	public void verifyStoragePermissions() {
+		int permission = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+		if (permission != PackageManager.PERMISSION_GRANTED) {
+			// We don't have permission so prompt the user
+			requestPermissions(
+					PERMISSIONS_STORAGE,
+					REQUEST_EXTERNAL_STORAGE
+			);
+		}
 	}
 }
